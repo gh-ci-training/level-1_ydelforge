@@ -1,0 +1,43 @@
+name: Handle polite contributors
+
+on:
+  issues:
+    types: [opened]
+
+env:
+  HELLO_MESSAGE: "Hello :wave:"
+  POLITE_LABEL: "polite"
+  ANGRY_MESSAGE: "No welcome for you! :angry:"
+
+jobs:
+  issue-handler:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Politeness checker
+        id: politeness-checker
+        if: ${{ startsWith(github.event.issue.body, env.HELLO_MESSAGE) }} 
+        run: gh issue edit "$NUMBER" --add-label "$POLITE_LABEL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+
+      - name: Generate greeting message
+        if: ${{ startsWith(github.event.issue.body, env.HELLO_MESSAGE) }} 
+        id: generate-greeting-message
+        env:
+          FLAG: ${{ secrets.FLAG }}
+        run: |
+          author=$(echo "${{ github.event.issue.body }}" | tail -n 1)
+          echo "message=Welcome $author! :smile:" >> "$GITHUB_OUTPUT"
+      
+      - name: Add greeting comment
+        id: commenter
+        run: gh issue comment "$NUMBER" --body "$BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          BODY: ${{ startsWith(github.event.issue.body, env.HELLO_MESSAGE) && steps.generate-greeting-message.outputs.message || env.ANGRY_MESSAGE }}
